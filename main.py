@@ -35,12 +35,13 @@ async def generate_response_stream(user_message: str):
     query_embedding = response_embed.embeddings[0].values
 
     # Step B: Scan Qdrant cluster for top contextual hits
-    search_result = qdrant.search(
+    search_result = qdrant.query_points(
         collection_name="portfolio_context",
-        query_vector=query_embedding,
+        query=query_embedding,
         limit=3
     )
-    context_chunks = [hit.payload["text"] for hit in search_result]
+    # Safely extract the text payload from the returned points
+    context_chunks = [hit.payload.get("text", "") for hit in search_result.points if hit.payload]
     context_text = "\n---\n".join(context_chunks)
 
     # Step C: Define Prompt Injection Guardrails
@@ -56,7 +57,7 @@ async def generate_response_stream(user_message: str):
 
     # Step D: Execute streaming call with system config
     response_stream = ai_client.models.generate_content_stream(
-        model='gemini-1.5-flash',
+        model='gemini-2.5-flash',
         contents=user_message,
         config=genai.types.GenerateContentConfig(
             system_instruction=system_instruction,
